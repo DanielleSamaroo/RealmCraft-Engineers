@@ -62,14 +62,20 @@ public class ClientEvents {
         @SubscribeEvent
         public static void onBlockBreak(BreakEvent event) {
             Block block = event.getState().getBlock();
+
+            // Allow breaking BlockA and BlockB
             if (block.equals(BlockInit.BLOCK_A.get())) {
                 BlockA.broken(event);
                 Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockA);
+                initialBlockBreak = true;
             } else if (block.equals(BlockInit.BLOCK_B.get())) {
                 BlockB.broken(event);
                 Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockB);
+                initialBlockBreak = true;
+            } else {
+                // Prevent breaking all other blocks (ground)
+                event.setCanceled(true);
             }
-
         }
 
         @SubscribeEvent
