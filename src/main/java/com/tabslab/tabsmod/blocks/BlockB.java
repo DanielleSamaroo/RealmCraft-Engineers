@@ -24,6 +24,10 @@ public class BlockB extends Block {
     }
 
     public static void broken(BlockEvent.BreakEvent event) {
+        // Check if stimulus point is reached and increment coins
+        if (Timer.isStimulusReached()) {
+            ExpHud.incrementCoins();
+        }
 
         // Update points
         int phase = Timer.currentPhase();
