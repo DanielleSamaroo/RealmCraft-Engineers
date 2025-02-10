@@ -13,9 +13,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.entity.animal.Animal;
-import net.minecraft.world.level.entity.EntityAccess;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.animal.Animal;
 import net.minecraft.world.entity.animal.WaterAnimal;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.server.level.ServerLevel;
@@ -27,18 +24,92 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.*;
-import java.util.List;
 
 public class Data {
 
     private static final ArrayList<Event> evts = new ArrayList<>();
     private static String playerName;
-
     public static final Map<String, BlockPos> blockPositions = new HashMap<>();
     private static Entity playerEntity;
+    private static double meanIntervalValue = 2000.0; // Mean interval value in ms (2s)
+    private static int numberOfSteps = 10; // Total number of intervals (steps)
+    private static double probability = .5; // Probability of reinforcement
+
+    //private static List<long> intervals;
 
     public static long sessionStartTime = 0;
     private static long sessionEndTime = 0;
+
+    public static void setParameters(double sec, int steps, double prob) {
+        Data.meanIntervalValue = sec;
+        Data.numberOfSteps = steps;
+        Data.probability = prob;
+    }
+
+    public static long[] generateIntervals() {
+        long totalDuration = 600_000; // Total duration of 10 minutes in milliseconds
+        long firstHalfDuration = 300_000; // First 5 minutes in milliseconds
+        long secondHalfDuration = 300_000; // Second 5 minutes in milliseconds
+        long baseTime = Timer.timeElapsed();
+        long[] intervalDurations = new long[numberOfSteps * 2];
+        double factor = -1.0 / Math.log(1 - probability);
+        Random random = new Random();
+
+        long[][] rawDurations = new long[2][numberOfSteps];
+
+        // Generate raw intervals for each half
+        for (int half = 0; half < 2; half++) {
+            long duration = (half == 0) ? firstHalfDuration : secondHalfDuration;
+            long rawTotalDuration = 0;
+
+            for (int n = 1; n <= numberOfSteps; n++) {
+                double t_n;
+                if (n == numberOfSteps) {
+                    t_n = factor * (1 + Math.log(numberOfSteps));
+                } else {
+                    t_n = factor * (
+                            1 + Math.log(numberOfSteps) +
+                                    (numberOfSteps - n) * Math.log(numberOfSteps - n) -
+                                    (numberOfSteps - n + 1) * Math.log(numberOfSteps - n + 1)
+                    );
+                }
+                double randomFactor = 0.7 + (0.3 * random.nextDouble());
+                long intervalDuration = (long) (t_n * meanIntervalValue * randomFactor);
+                rawDurations[half][n - 1] = intervalDuration;
+                rawTotalDuration += intervalDuration;
+            }
+
+            // Scale intervals to fit exactly within the half duration
+            double scalingFactor = (double) duration / rawTotalDuration;
+            for (int i = 0; i < numberOfSteps; i++) {
+                rawDurations[half][i] = (long) (rawDurations[half][i] * scalingFactor);
+            }
+        }
+
+        // Combine intervals and adjust base time
+        int index = 0;
+        for (int half = 0; half < 2; half++) {
+            for (int i = 0; i < numberOfSteps; i++) {
+                intervalDurations[index] = rawDurations[half][i] + baseTime;
+                baseTime = intervalDurations[index];
+                index++;
+            }
+        }
+
+        // To log intervals
+        System.out.println("Generated Intervals:");
+        long startTime = Timer.timeElapsed();
+        for (int i = 0; i < intervalDurations.length; i++) {
+            long endTime = startTime + intervalDurations[i];
+            System.out.printf("Interval %d: Start = %d ms, End = %d ms, Interval Duration = %d ms%n",
+                    i + 1, startTime, endTime, intervalDurations[i]);
+            startTime = endTime; // Updates startTime for the next interval
+        }
+
+        return intervalDurations;
+    }
+
+
 
     public static void setPlayerEntity(Entity entity) {
         playerEntity = entity;
@@ -48,6 +119,11 @@ public class Data {
 
         System.out.println("Player Chunk: ");
         System.out.println(entity.chunkPosition());
+    }
+
+    public static void teleportPlayer(double x, double y, double z) {
+        playerEntity.moveTo(x, y, z);
+        //playerEntity.setPositionAndUpdate(x, y, z);
     }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
@@ -93,16 +169,15 @@ public class Data {
             int chunkX_b = chunk_b.getPos().x;
             int chunkZ_b = chunk_b.getPos().z;
 
-            int y_a = block_a_pos.getY(); // maintain the y coordinate of block_a
-            int y_b = block_b_pos.getY(); // maintain the y coordinate of block_b
+            // Gets position of player
+            BlockPos playerPos = playerEntity.getOnPos();
+            int xPos = playerPos.getX();
+            int yPos = playerPos.getY();
+            int zPos = playerPos.getZ();
+            // Respawns blocks to be at an equidistant position from player
+            BlockPos updated_block_a_pos_new = new BlockPos(xPos + 3, yPos + 1, zPos + 3);
+            BlockPos updated_block_b_pos_new = new BlockPos(xPos - 3, yPos + 1, zPos + 3);
 
-            int newX_a = chunkX_a * 16 + random.nextInt(16);
-            int newZ_a = chunkZ_a * 16 + random.nextInt(16);
-            BlockPos updated_block_a_pos_new = new BlockPos(newX_a, y_a, newZ_a);
-
-            int newX_b = chunkX_b * 16 + random.nextInt(16);
-            int newZ_b = chunkZ_b * 16 + random.nextInt(16);
-            BlockPos updated_block_b_pos_new = new BlockPos(newX_b, y_b, newZ_b);
 
             // Place the blocks at the new random positions
             BlockState blockStateA = BlockInit.BLOCK_A.get().defaultBlockState();
@@ -142,9 +217,11 @@ public class Data {
 
     public static void removeAnimals(Level level) {
         if (!(level instanceof ServerLevel)) {
+            System.out.println("Not a ServerLevel instance.");
             return;
         }
 
+        System.out.println("Removing animals...");
         ServerLevel serverLevel = (ServerLevel) level;
 
         AABB worldBounds = new AABB(
@@ -224,15 +301,14 @@ public class Data {
     }
 
     public static void writeToCSV() {
+
         System.out.println("-----------------------------------------");
         System.out.println("Creating csv file...");
         System.out.println("-----------------------------------------");
 
-        // Ensure the file is created correctly for the player
         File file = new File(playerName + ".csv");
 
-        try (PrintWriter pw = new PrintWriter(file)) {
-            // Format start and end times
+        try(PrintWriter pw = new PrintWriter(file)) {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
             dateFormat.setTimeZone(TimeZone.getDefault());
 
@@ -246,14 +322,19 @@ public class Data {
             pw.println(timeZoneStr);
             pw.println();
 
-            // Add player name as a header
+            // Add headers
             pw.println("Player Name: " + playerName);
-            pw.println("Time,Type,Data");
 
             // Write events
+            String[] cols = { "Time", "Type", "Other Data" };
+            pw.println(String.join(",", cols));
+
             for (Event evt : evts) {
                 pw.println(evt.toCSV());
             }
+
+            // Close connection
+            pw.close();
 
             System.out.println("-----------------------------------------");
             System.out.println("Data File Created!");
@@ -261,11 +342,12 @@ public class Data {
             System.out.println("-----------------------------------------");
 
         } catch (IOException e) {
+
             System.out.println("-----------------------------------------");
             System.out.println("Exception during file creation:");
             System.out.println(e.getMessage());
             System.out.println("-----------------------------------------");
         }
-    }
 
+    }
 }
