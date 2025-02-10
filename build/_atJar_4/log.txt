@@ -1,0 +1,7 @@
+Java Launcher: C:\Users\danie\.gradle\jdks\adoptium-17-x64-hotspot-windows\jdk-17.0.14+7\bin\java.exe
+Arguments: '--inJar, C:\Users\danie\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.19.3-44.1.0\forge-1.19.3-44.1.0-injected.jar, --outJar, C:\Users\danie\.gradle\caches\forge_gradle\minecraft_user_repo\net\minecraftforge\forge\1.19.3-44.1.0_mapped_official_1.19.3\forge-1.19.3-44.1.0_mapped_official_1.19.3.jar, --logFile, accesstransform.log, --atFile, C:\Users\danie\IdeaProjects\tabsmod-master\tabsmod-master\build\_atJar_4\parent_at.cfg'
+Classpath:
+ - C:\Users\danie\.gradle\caches\forge_gradle\maven_downloader\net\minecraftforge\accesstransformers\8.0.7\accesstransformers-8.0.7-fatjar.jar
+Working directory: C:\Users\danie\IdeaProjects\tabsmod-master\tabsmod-master\build\_atJar_4
+Main class: net.minecraftforge.accesstransformer.TransformerProcessor
+====================================
