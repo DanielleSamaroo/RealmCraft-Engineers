@@ -1,0 +1,25 @@
+Start: 2025/02/09 16:51:30
+End: 2025/02/09 16:53:36
+16:53:36 EST
+
+Player Name: Dev
+Time,Type,Data
+0,blocks_spawn_initial,{"block_b_spawn":{"x":-190`"y":63`"z":-579}`"block_a_set":true`"block_b_set":true`"block_a_spawn":{"x":-188`"y":63`"z":-579}}
+0,phase_1_start,none
+0,player_join_level,{"difficulty":"normal"`"is_hardcore":false`"spawn_angle":0.0`"spawn_position":"{\"z\":8`\"y\":64`\"x\":8}"`"game_time":0`"day_time":0`"is_raining":false`"is_thundering":false}
+9023,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-188`"y":63`"z":-579}`"hand":"MAIN_HAND"}
+9086,block_a_break,{"cumulative_points":1`"position":{"x":-188`"y":63`"z":-579}}
+9091,blocks_spawn,{"block_b_spawn":{"x":-186`"y":63`"z":-592}`"block_a_set":true`"block_b_set":true`"block_a_spawn":{"x":-191`"y":63`"z":-585}}
+14768,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-191`"y":63`"z":-585}`"hand":"MAIN_HAND"}
+14778,block_a_break,{"cumulative_points":2`"position":{"x":-191`"y":63`"z":-585}}
+14782,blocks_spawn,{"block_b_spawn":{"x":-185`"y":63`"z":-592}`"block_a_set":true`"block_b_set":true`"block_a_spawn":{"x":-182`"y":63`"z":-583}}
+34866,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-212`"y":62`"z":-659}`"hand":"MAIN_HAND"}
+42916,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-211`"y":62`"z":-685}`"hand":"MAIN_HAND"}
+62617,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-267`"y":62`"z":-755}`"hand":"MAIN_HAND"}
+63417,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-266`"y":62`"z":-755}`"hand":"MAIN_HAND"}
+63717,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-266`"y":62`"z":-756}`"hand":"MAIN_HAND"}
+77265,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-230`"y":67`"z":-773}`"hand":"MAIN_HAND"}
+78065,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-230`"y":67`"z":-772}`"hand":"MAIN_HAND"}
+78315,left_click_block,{"result":"DEFAULT"`"useBlock":"DEFAULT"`"position":{"x":-230`"y":66`"z":-772}`"hand":"MAIN_HAND"}
+126254,player_leave_level,{"name":"Dev"`"position":{"x":-231.03438061395616`"y":67.0`"z":-773.0526284243657}}
+900000,phase_set_4,{"old_phase":1`"new_phase":4}
