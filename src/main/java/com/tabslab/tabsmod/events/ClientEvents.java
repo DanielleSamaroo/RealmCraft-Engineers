@@ -32,14 +32,14 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 import net.minecraft.world.entity.animal.*;
-import net.minecraft.world.entity.animal.Animal;
 
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class ClientEvents {
-
+    private static boolean initialBlockBreak;
+    private static boolean intervalStart = false;
 
     @Mod.EventBusSubscriber(bus=Mod.EventBusSubscriber.Bus.MOD, modid=TabsMod.MODID, value=Dist.CLIENT)
     public static class ClientModBusEvents {
@@ -56,6 +56,23 @@ public class ClientEvents {
         @SubscribeEvent
         public static void registerCommands(RegisterCommandsEvent event) {
             Session.register(event.getDispatcher());
+        }
+
+        // Tick is unit of time within game's update cycle
+        @SubscribeEvent
+        public static void onTicks(TickEvent.PlayerTickEvent event) {
+            if (event.phase == TickEvent.Phase.END) {
+                // Check if the first block was broken and intervals haven't started
+                if (initialBlockBreak && !intervalStart) {
+                    System.out.printf("Interval started\n");
+
+                    // Generate intervals and pass them to the Timer
+                    long[] intervals = Data.generateIntervals();
+                    Timer.setIntervals(intervals); // Set the intervals in the Timer class
+
+                    intervalStart = true; // Mark intervals as started
+                }
+            }
         }
 
         // Will be run when a block is broken
@@ -109,6 +126,9 @@ public class ClientEvents {
 
             // First, spawn block_a and block_b equidistant from player
             Data.respawnBlocks(event.getEntity().getLevel(), true, BlockBroken.Neither);
+
+            // Flag for interval
+            initialBlockBreak = false;
 
             // Begin timer
             Timer.startTimer();
