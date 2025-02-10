@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "tabsmod:block/block_a"
+    }
+  }
+}

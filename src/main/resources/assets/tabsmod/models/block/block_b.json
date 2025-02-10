@@ -1,0 +1,8 @@
+{
+  "parent": "block/cube_bottom_top",
+  "textures": {
+    "bottom": "tabsmod:block/grass_top",
+    "top": "tabsmod:block/grass_top",
+    "side": "tabsmod:block/block_b"
+  }
+}
