@@ -300,17 +300,28 @@ public class ClientEvents {
 
         @SubscribeEvent
         public static void onPlayerMove(TickEvent.PlayerTickEvent event) {
-            if (event.phase == TickEvent.Phase.START) {
-                Player player = event.player;
-                if (player != null && player.level != null && player.level.isClientSide) {
-                    long time = Timer.timeElapsed();
-                    BlockPos pos = player.blockPosition();
+            Player player = event.player;
+            Vec3 currentPosition = player.position();
 
-                    Map<String, Object> data = new HashMap<>();
-                    data.put("position", pos);
+            if (!currentPosition.equals(lastPosition)) {
+                long time = Timer.timeElapsed();
+                Map<String, Object> data = new HashMap<>();
+                data.put("position", currentPosition);
+                Data.addEvent("player_move", time, data);
+                lastPosition = currentPosition;
+            }
+        }
 
-                    Data.addEvent("player_move", time, data);
-                }
+        @SubscribeEvent
+        public static void onKeyPress(InputEvent.Key event) {
+            long time = Timer.timeElapsed();
+            int key = event.getKey();
+            int action = event.getAction();
+
+            if (action == GLFW.GLFW_PRESS) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("key", key);
+                Data.addEvent("key_press", time, data);
             }
         }
 
