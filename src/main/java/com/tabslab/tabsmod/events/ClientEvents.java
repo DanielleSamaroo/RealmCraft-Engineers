@@ -31,7 +31,8 @@ import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
-import net.minecraft.world.entity.animal.*;
+import net.minecraft.world.entity.animal.Animal;
+import net.minecraft.world.entity.animal.WaterAnimal;
 
 
 import java.util.HashMap;
@@ -120,9 +121,6 @@ public class ClientEvents {
 
             // Set entity
             Data.setPlayerEntity(event.getEntity());
-
-            // Remove all existing animals when the player joins
-            Data.removeAnimals(event.getEntity().getLevel());
 
             // First, spawn block_a and block_b equidistant from player
             Data.respawnBlocks(event.getEntity().getLevel(), true, BlockBroken.Neither);
@@ -293,9 +291,10 @@ public class ClientEvents {
 
         @SubscribeEvent
         public static void onEntityJoin(EntityJoinLevelEvent event) {
-            if (event.getEntity() instanceof Animal || event.getEntity() instanceof WaterAnimal) {
-                event.getEntity().discard();
-                System.out.println("Animal removed: " + event.getEntity().getType().toString());
+            Entity entity = event.getEntity();
+            
+            if (entity instanceof Animal || entity instanceof WaterAnimal) {
+                event.setCanceled(true);
             }
         }
 
