@@ -41,6 +41,8 @@ import java.util.Map;
 public class ClientEvents {
     private static boolean initialBlockBreak;
     private static boolean intervalStart = false;
+    private static Vec3 lastPosition = new Vec3(0, 0, 0);
+
 
     @Mod.EventBusSubscriber(bus=Mod.EventBusSubscriber.Bus.MOD, modid=TabsMod.MODID, value=Dist.CLIENT)
     public static class ClientModBusEvents {
