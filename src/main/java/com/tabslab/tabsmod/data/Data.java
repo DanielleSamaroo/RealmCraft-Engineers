@@ -12,6 +12,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,8 +26,12 @@ public class Data {
     private static final ArrayList<Event> evts = new ArrayList<>();
     private static String playerName;
 
+
     public static final Map<String, BlockPos> blockPositions = new HashMap<>();
     private static Entity playerEntity;
+
+    public static long sessionStartTime = 0;
+    private static long sessionEndTime = 0;
 
     public static void setPlayerEntity(Entity entity) {
         playerEntity = entity;
@@ -126,7 +133,6 @@ public class Data {
         }
     }
 
-
     public static void addEvent(String type, long time, Map<String, Object> data) {
         boolean dev = TabsMod.getDev();
         if (!dev) {
@@ -174,6 +180,7 @@ public class Data {
 
     public static void endSession() {
         boolean dev = TabsMod.getDev();
+        sessionEndTime = System.currentTimeMillis();
         if (!dev) {
             writeToCSV();
         }
@@ -191,6 +198,18 @@ public class Data {
         File file = new File(playerName + ".csv");
 
         try(PrintWriter pw = new PrintWriter(file)) {
+            // Get date, start time, and end time
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            dateFormat.setTimeZone(TimeZone.getDefault());
+            String startTimeStr = dateFormat.format(new Date(sessionStartTime));
+            String endTimeStr = dateFormat.format(new Date(sessionEndTime));
+            String timeZoneStr = new SimpleDateFormat("HH:mm:ss z").format(new Date(sessionEndTime));
+
+            // Write session info at the beginning of CSV
+            pw.println("Start: " + startTimeStr);
+            pw.println("End: " + endTimeStr);
+            pw.println(timeZoneStr);
+            pw.println();
 
             // Add headers
             pw.println("Player Name: " + playerName);
