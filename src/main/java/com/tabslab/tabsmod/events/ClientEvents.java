@@ -299,5 +299,21 @@ public class ClientEvents {
             }
         }
 
+        @SubscribeEvent
+        public static void onPlayerMove(TickEvent.PlayerTickEvent event) {
+            if (event.phase == TickEvent.Phase.START) {
+                Player player = event.player;
+                if (player != null && player.level != null && player.level.isClientSide) {
+                    long time = Timer.timeElapsed();
+                    BlockPos pos = player.blockPosition();
+
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("position", pos);
+
+                    Data.addEvent("player_move", time, data);
+                }
+            }
+        }
+
     }
 }
