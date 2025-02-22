@@ -268,10 +268,12 @@ public class Data {
         File file = new File(playerName + ".csv");
 
         try(PrintWriter pw = new PrintWriter(file)) {
-            // Get date, start time, and end time
+            // Get date
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
             dateFormat.setTimeZone(TimeZone.getDefault());
+            // Get start time
             String startTimeStr = dateFormat.format(new Date(sessionStartTime));
+            // Get end time
             String endTimeStr = dateFormat.format(new Date(sessionEndTime));
             String timeZoneStr = new SimpleDateFormat("HH:mm:ss z").format(new Date(sessionEndTime));
 
