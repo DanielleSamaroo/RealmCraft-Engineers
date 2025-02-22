@@ -313,6 +313,7 @@ public class ClientEvents {
             }
         }
 
+        // Removes all animals
         @SubscribeEvent
         public static void onEntityJoin(EntityJoinLevelEvent event) {
             Entity entity = event.getEntity();
@@ -322,6 +323,7 @@ public class ClientEvents {
             }
         }
 
+        // Tracks player moves
         @SubscribeEvent
         public static void onPlayerMove(TickEvent.PlayerTickEvent event) {
             Player player = event.player;
@@ -337,7 +339,7 @@ public class ClientEvents {
         }
 
 
-
+        // Tracks players key pressed
         @SubscribeEvent
         public static void onKeyPress(InputEvent.Key event) {
             long time = Timer.timeElapsed();
