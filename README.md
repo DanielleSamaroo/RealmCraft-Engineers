@@ -1,5 +1,5 @@
 # TabsMod
-Authors: _[Matthew Lamperski](mailto:matthewlamperski@ufl.edu) and [Jialong Zhen](mailto:zhen.jialong@ufl.edu) and [Han Mach](mailto:hmach@ufl.edu)
+Senior Project Group: _[Susana Lugones](mailto:slugones@ufl.edu) and [Danielle Samaroo](mailto:d.samaroo@ufl.edu)
 ___
 A custom Minecraft mod created to explore behavioral principles in conjunction with the University of Florida's [Translational Applied Behavioral Science Lab](https://www.tabs-labs.com/).
 This project will aim to explore the viability of using Minecraft as a custom interface for conducting research into behavioral principles.
