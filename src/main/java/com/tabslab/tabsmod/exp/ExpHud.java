@@ -15,16 +15,20 @@ import net.minecraftforge.client.gui.overlay.IGuiOverlay;
 import java.awt.*;
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.List;
 
 @OnlyIn(Dist.CLIENT)
 public class ExpHud {
     private static int numPts = 0;
     private static int currentPhase = 0;
-
-    // Add this field to track the total coins earned
     private static double totalCoins = 0.0;
-
     private static boolean coinAvailable = false;
+
+    private static boolean showPickupPrompt = false;
+
+    public static void setShowPickupPrompt(boolean show) {
+        showPickupPrompt = show;
+    }
 
     public static boolean isCoinAvailable() {
         return coinAvailable;
@@ -36,10 +40,10 @@ public class ExpHud {
 
 
     // Method to increment coins based on the current interval and stimulus
-    public static void incrementCoins() {
+    public static void incrementCoins(double x) {
         int phase = Timer.currentPhase();
         if (phase >= 1 && phase <= Timer.getTotalPhases()) {
-            totalCoins += 0.0005;
+            totalCoins += x;
         }
     }
 
@@ -56,11 +60,33 @@ public class ExpHud {
         int linePadding = 5;
         int lineHeight = font.lineHeight;
 
-        // Check if stimulus point is reached and increment coins
-        if (Timer.isStimulusReached()) {
-            incrementCoins();
+        if (showPickupPrompt) {
+            String pickupMessage = "Please pick up the coin to proceed";
+            int messageWidth = Minecraft.getInstance().font.width(pickupMessage);
+            int x = (screenWidth - messageWidth) / 2;
+            int y = screenHeight / 2; // Center vertically
+            GuiComponent.drawString(poseStack, Minecraft.getInstance().font, pickupMessage, x, y, 0xFFFFFF); // white color
         }
 
+        // display vi Timer
+        if (Timer.isViRunning() || Timer.viTimeRemaining() == 0) {
+            long viRemaining = Math.max(Timer.viTimeRemaining(), 0); // ensures it doesnt go negative
+            String viTime = "Vi Timer: " + viRemaining + "ms";
+            int viWidth = font.width(viTime);
+            int viX = 10;
+            int viY = 10;
+            GuiComponent.drawString(poseStack, font, viTime, viX, viY, textColor);
+
+            List<Long> intervals = Timer.getViIntervals(); // Get the interval list
+            if (intervals != null && !intervals.isEmpty()) {
+                int yOffset = 20;
+                for (int i = 0; i < intervals.size(); i++) {
+                    String intervalText = intervals.get(i) + "ms";
+                    GuiComponent.drawString(poseStack, font, intervalText, viX, viY + yOffset, textColor);
+                    yOffset += 12;
+                }
+            }
+        }
 
         // Is session over?
         int phase = Timer.currentPhase();
