@@ -1,4 +1,3 @@
-// enter "/execute in tabsmod:desert_dimension run tp @s ~ ~ ~" in chat
 {
   "type": "minecraft:overworld",
   "generator": {
