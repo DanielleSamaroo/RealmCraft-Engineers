@@ -1,25 +1,53 @@
 package com.tabslab.tabsmod.exp;
 
 import com.tabslab.tabsmod.data.Data;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 
 import java.sql.Time;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Timer {
     private static long startTime = 0;
     private static long phaseLength = 300000; // Milliseconds
     private static int totalPhases = 3;
-
     private static boolean timerStarted = false;
     private static long[] intervals = new long[0];
     private static int currentInterval = 0; // Track the current interval
+    private static long pauseTime = 0; // Track when the timer was paused
+    private static boolean timerPaused = false;
+    private static int lastPhase = -1;
 
-    public static void setIntervals(long[] generatedIntervals) {
-        intervals = generatedIntervals;
-        currentInterval = 0;
+    // vi Timer
+    private static List<Long> viIntervals;
+    private static int currentViIndex = -1;
+    private static long viStartTime = 0;
+    private static boolean viTimerRunning = false;
+
+    public static void pauseTimer() {
+        if (!timerPaused) {
+            pauseTime = System.currentTimeMillis();
+            timerPaused = true;
+        }
     }
+
+    public static void resumeTimer() {
+        if (timerPaused) {
+            long pausedDuration = System.currentTimeMillis() - pauseTime;
+            startTime += pausedDuration; // Adjust start time by the paused duration
+            timerPaused = false;
+        }
+    }
+
+    public static long timeElapsed() {
+        if (!timerStarted || timerPaused) {
+            return pauseTime - startTime; // Return the time before pausing
+        }
+        return System.currentTimeMillis() - startTime;
+    }
+
 
     // Check if the stimulus point for the current interval has been reached
     public static boolean isStimulusReached() {
@@ -51,11 +79,15 @@ public class Timer {
         return timerStarted;  // Getter method to check if the timer has started
     }
 
-    public static long timeElapsed() {
-        if (!timerStarted) {
-            return 0;  // If the timer hasn't started, return 0
-        }
-        return System.currentTimeMillis() - startTime;
+    public static void scheduleDelayedTask(Runnable task, long delayMillis) {
+        new Thread(() -> {
+            try {
+                Thread.sleep(delayMillis);
+                Minecraft.getInstance().execute(task);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     public static String timeString() {
@@ -92,4 +124,59 @@ public class Timer {
         setPhase(totalPhases + 1);
     }
 
+
+    public static void startViTimer() {
+        if (viIntervals == null || viIntervals.isEmpty()) {
+            viIntervals = Data.generateIntervals(); // Generate intervals from Data.java
+        }
+        currentViIndex = 0;
+        viStartTime = System.currentTimeMillis();
+        viTimerRunning = true;
+    }
+
+    public static List<Long> getViIntervals() {
+        return viIntervals;
+    }
+
+    public static void newIntervals() {
+        viIntervals = Data.generateIntervals();
+    }
+
+    public static long viTimeRemaining() {
+        if (!viTimerRunning || currentViIndex < 0 || currentViIndex >= viIntervals.size()) {
+            return 0;
+        }
+
+        long elapsed = System.currentTimeMillis() - viStartTime;
+        long remaining = viIntervals.get(currentViIndex) - elapsed;
+
+        if (remaining <= 0) {
+            return 0;
+        }
+
+        return remaining;
+    }
+
+    public static void nextViInterval() {
+        if (viIntervals == null || viIntervals.isEmpty() || currentViIndex >= viIntervals.size() - 1) {
+            viIntervals = Data.generateIntervals();
+            currentViIndex = 0;
+        } else {
+            currentViIndex++;
+        }
+        viStartTime = System.currentTimeMillis();
+    }
+
+    public static boolean isViRunning() {
+        return viTimerRunning && viTimeRemaining() > 0;
+    }
+
+    public static boolean hasPhaseChanged() {
+        int currentPhase = currentPhase();
+        if (currentPhase != lastPhase) {
+            lastPhase = currentPhase; // update last phase
+            return true; // phase has changed
+        }
+        return false; // no phase change
+    }
 }
