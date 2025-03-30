@@ -1,4 +1,5 @@
 package com.tabslab.tabsmod.blocks;
+
 import com.tabslab.tabsmod.data.Data;
 import com.tabslab.tabsmod.exp.ExpHud;
 import com.tabslab.tabsmod.exp.Timer;
@@ -16,6 +17,7 @@ import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.event.level.BlockEvent;
 import net.minecraftforge.registries.RegistryObject;
+
 import java.sql.Time;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,11 +30,6 @@ public class BlockA extends Block {
     }
 
     public static void broken(BlockEvent.BreakEvent event) {
-        // Check if stimulus point is reached and increment coins
-        if (Timer.isStimulusReached()) {
-            ExpHud.incrementCoins();
-        }
-
         // Add to event list
         long time = Timer.timeElapsed();
 
