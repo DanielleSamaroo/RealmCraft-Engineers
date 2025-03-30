@@ -40,12 +40,13 @@ import net.minecraft.world.entity.Mob;
 
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class ClientEvents {
     private static boolean initialBlockBreak;
-    private static boolean intervalStart = false;
     private static Vec3 lastPosition = new Vec3(0, 0, 0);
+    private static List<Long> intervals;
 
     @Mod.EventBusSubscriber(bus=Mod.EventBusSubscriber.Bus.MOD, modid=TabsMod.MODID, value=Dist.CLIENT)
     public static class ClientModBusEvents {
@@ -64,20 +65,12 @@ public class ClientEvents {
             Session.register(event.getDispatcher());
         }
 
-        // Tick is unit of time within game's update cycle
+        // tick is unit of time within game's update cycle
         @SubscribeEvent
         public static void onTicks(TickEvent.PlayerTickEvent event) {
-            if (event.phase == TickEvent.Phase.END) {
-                // Check if the first block was broken and intervals haven't started
-                if (initialBlockBreak && !intervalStart) {
-                    System.out.printf("Interval started\n");
-
-                    // Generate intervals and pass them to the Timer
-                    long[] intervals = Data.generateIntervals();
-                    Timer.setIntervals(intervals); // Set the intervals in the Timer class
-
-                    intervalStart = true; // Mark intervals as started
-                }
+            if (Timer.hasPhaseChanged() && initialBlockBreak) {
+                Timer.newIntervals();
+                Timer.startViTimer(); // "restart" Vi Timer on phase change
             }
         }
 
@@ -90,8 +83,18 @@ public class ClientEvents {
             if (itemStack.getItem() == ItemInit.COIN.get()) {
                 ExpHud.incrementPts(1);  // This should add points when a coin is picked up
                 System.out.println("Coin picked up, points incremented");
+
+                // Resume the timer when the coin is picked up
+                Timer.resumeTimer();
+            }
+
+            // Coin picked up, reset the prompt
+            if (itemStack.getItem() == ItemInit.COIN.get()) {
+                ExpHud.setCoinAvailable(false);
+                ExpHud.setShowPickupPrompt(false);
             }
         }
+
 
         // Will be run when a block is broken
         @SubscribeEvent
@@ -100,23 +103,104 @@ public class ClientEvents {
 
             // Check if either BlockA or BlockB is broken
             if (block.equals(BlockInit.BLOCK_A.get()) || block.equals(BlockInit.BLOCK_B.get())) {
+                // TO COLLECT CSV DATA
+                Map<String, Object> data = new HashMap<>();
+                data.put("block_type", block.getDescriptionId());
+                data.put("position", event.getPos());
+                data.put("phase", Timer.currentPhase());
+                data.put("vi_time_remaining", Timer.viTimeRemaining());
+                Data.addEvent("block_broken", Timer.timeElapsed(), data);
+                // Pause the timer when a coin is potentially dropped
+                //Timer.pauseTimer();
+
+                // Mark the coin as available when it drops
+                //ExpHud.setCoinAvailable(true);
+
                 // Check if timer has not been started yet
                 if (!Timer.timerStarted()) {
                     Timer.startTimer();  // Start the timer on first block break
-                    initialBlockBreak = true;  // Set the flag indicating the first block has been broken
+                }
+                
+                //  if the first block is broken, start interval schedule for each phase
+                if (!initialBlockBreak) {
+                    initialBlockBreak = true;
+                    ExpHud.incrementCoins(.0005);
+                    Timer.startViTimer();
+                }
+
+                // if interval scheudule has started
+                if (initialBlockBreak && Timer.currentPhase() == 1) {
+                    if (Timer.viTimeRemaining() == 0) {
+                        if (block.equals(BlockInit.BLOCK_A.get())) {
+                            ExpHud.incrementCoins(.0005);
+                        }
+                        else { // block b
+                            ExpHud.incrementCoins(-.0005); // penalty for breaking the wrong one
+                        }
+                        Timer.nextViInterval();
+                    }
+                    else { // penalty for breaking before reinforcement time
+                        ExpHud.incrementCoins(-.0005);
+                    }
+                }
+                else if (Timer.currentPhase() == 2) {
+                    if (Timer.viTimeRemaining() == 0) {
+                        if (block.equals(BlockInit.BLOCK_B.get())) { // reinforcement if block b
+                            ExpHud.incrementCoins(.0005);
+                        }
+                        else { // block b
+                            ExpHud.incrementCoins(-.0005); // penalty for breaking the wrong one
+                        }
+                        Timer.nextViInterval();
+                    }
+                    else { // penalty for breaking before reinforcement time
+                        ExpHud.incrementCoins(-.0005);
+                    }
+                }
+                else if (Timer.currentPhase() == 3) {
+                    // do nothing
+                }
+
+                //  if the first block is broken, start interval schedule for each phase
+                if (!initialBlockBreak) {
+                    initialBlockBreak = true;
+                    ExpHud.incrementCoins(.0005);
+                    Timer.startViTimer();
+                }
+
+                if (!ExpHud.isCoinAvailable()) {
+                    if (Timer.currentPhase() == 1 && block.equals(BlockInit.BLOCK_A.get())) {
+                        Timer.pauseTimer();
+                        ExpHud.setCoinAvailable(true);
+
+                        Timer.scheduleDelayedTask(() -> {
+                            if (ExpHud.isCoinAvailable()) {
+                                ExpHud.setShowPickupPrompt(true);
+                            }
+                        }, 5000);
+                    }
+                    else if (Timer.currentPhase() == 2 && block.equals(BlockInit.BLOCK_B.get())) {
+                        Timer.pauseTimer();
+                        ExpHud.setCoinAvailable(true);
+
+                        Timer.scheduleDelayedTask(() -> {
+                            if (ExpHud.isCoinAvailable()) {
+                                ExpHud.setShowPickupPrompt(true);
+                            }
+                        }, 5000);
+                    }
+                }
+
+                // Allow breaking BlockA and BlockB
+                if (block.equals(BlockInit.BLOCK_A.get())) {
+                    BlockA.broken(event);
+                    Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockA);
+                } else if (block.equals(BlockInit.BLOCK_B.get())) {
+                    BlockB.broken(event);
+                    Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockB);
                 }
             }
-
-            // Allow breaking BlockA and BlockB
-            if (block.equals(BlockInit.BLOCK_A.get())) {
-                BlockA.broken(event);
-                Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockA);
-                //initialBlockBreak = true;
-            } else if (block.equals(BlockInit.BLOCK_B.get())) {
-                BlockB.broken(event);
-                Data.respawnBlocks(event.getPlayer().getLevel(), false, BlockBroken.BlockB);
-                //initialBlockBreak = true;
-            } else {
+            else {
                 // Prevent breaking all other blocks (ground)
                 event.setCanceled(true);
             }
@@ -312,7 +396,6 @@ public class ClientEvents {
             }
         }
 
-        // Removes all animals and mobs
         @SubscribeEvent
         public static void onEntityJoin(EntityJoinLevelEvent event) {
             Entity entity = event.getEntity();
@@ -322,7 +405,6 @@ public class ClientEvents {
             }
         }
 
-        // Tracks all player moves
         @SubscribeEvent
         public static void onPlayerMove(TickEvent.PlayerTickEvent event) {
             Player player = event.player;
@@ -338,7 +420,7 @@ public class ClientEvents {
         }
 
 
-        // Tracks all players key pressed
+
         @SubscribeEvent
         public static void onKeyPress(InputEvent.Key event) {
             long time = Timer.timeElapsed();
