@@ -8,23 +8,29 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.DropExperienceBlock;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Material;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.registries.RegistryObject;
 
+import java.sql.Time;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-public class BlockB extends Block {
-    public BlockB(BlockBehaviour.Properties properties) {
+public class BlockA extends Block {
+
+    public BlockA(BlockBehaviour.Properties properties) {
         super(properties);
     }
 
     public static void broken(BlockEvent.BreakEvent event) {
-      // Add to event list
+        // Add to event list
         long time = Timer.timeElapsed();
 
         Map<String, Object> data = new HashMap<>();
@@ -36,8 +42,9 @@ public class BlockB extends Block {
 
     @Override
     public void onPlace(BlockState state, Level world, BlockPos pos, BlockState state1, boolean myBool) {
-        Data.blockPositions.put("block_b", pos);
+        Data.blockPositions.put("block_a", pos);
     }
+
 
     // This is triggered when block is punched (left mouse click)
     @Override
@@ -52,16 +59,14 @@ public class BlockB extends Block {
                 // Add to event list
                 Map<String, Object> data = new HashMap<>();
                 data.put("position", pos);
-                Data.addEvent("Block B Punch", time, data);
+                Data.addEvent("block_a_punch", time, data);
 
                 // Add (or don't add) to points depending on phase
                 int phase = Timer.currentPhase();
 
                 switch (phase) {
-                    case 1, 3: ExpHud.incrementPts(0);
-                        break;
-                    case 2: ExpHud.incrementPts(1);
-                        break;
+                    case 1 -> ExpHud.incrementPts(1);
+                    case 2, 3 -> ExpHud.incrementPts(0);
                 }
             }
         }
@@ -81,7 +86,7 @@ public class BlockB extends Block {
             data.put("position", pos);
             data.put("hand", hand);
             data.put("result", res);
-            Data.addEvent("block_b_use", time, data);
+            Data.addEvent("block_a_use", time, data);
         }
 
         return super.use(state, level, pos, player, hand, res);
