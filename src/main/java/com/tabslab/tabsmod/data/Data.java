@@ -5,11 +5,20 @@ import com.tabslab.tabsmod.exp.ExpHud;
 import com.tabslab.tabsmod.exp.Timer;
 import com.tabslab.tabsmod.init.BlockInit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.CommandBlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
@@ -114,10 +123,10 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-    public static void teleportPlayer(double x, double y, double z) {
-        playerEntity.moveTo(x, y, z);
-        //playerEntity.setPositionAndUpdate(x, y, z);
-    }
+//    public static void teleportPlayer(double x, double y, double z) {
+//        playerEntity.moveTo(x, y, z);
+//        //playerEntity.setPositionAndUpdate(x, y, z);
+//    }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
         blockPositions.put("block_a", positions.get("block_a"));
@@ -169,6 +178,7 @@ public class Data {
             int zPos = playerPos.getZ();
 
             // Respawns blocks to be at an equidistant position from player
+            // block a on left and block b on right ( *** adjust x pos *** )
             BlockPos updated_block_a_pos_new = new BlockPos(xPos + 3, yPos + 1, zPos + 6);
             BlockPos updated_block_b_pos_new = new BlockPos(xPos - 3, yPos + 1, zPos + 6);
 
@@ -196,7 +206,88 @@ public class Data {
 
             blockPositions.put("block_a", updated_block_a_pos_new);
             blockPositions.put("block_b", updated_block_b_pos_new);
+        }
 
+        // Teleportation block placement
+        if (initialSpawn) {
+            BlockPos spawnPos = playerEntity.getOnPos();
+            Direction playerFacing = playerEntity.getDirection();
+            Direction behindPlayer = playerFacing.getOpposite();
+
+            BlockPos startBehindPos = spawnPos.relative(behindPlayer, 3);
+
+            int startX = startBehindPos.getX() - 9;
+            int zLevel = startBehindPos.getZ();
+            int groundY = lvl.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, startBehindPos).getY();
+            int xOffset = 0;
+
+            // Cherry Dimension
+            BlockPos cherryTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
+            teleportPlayer(lvl, cherryTeleportPos, "tabsmod:cherry_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
+            xOffset++;
+
+            // Desert Dimension
+            BlockPos desertTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
+            teleportPlayer(lvl, desertTeleportPos, "tabsmod:desert_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
+            xOffset++;
+
+            // Frozen Dimension
+            BlockPos frozenTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
+            teleportPlayer(lvl, frozenTeleportPos, "tabsmod:frozen_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
+            xOffset++;
+
+            // Mushroom Dimension
+            BlockPos mushroomTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
+            teleportPlayer(lvl, mushroomTeleportPos, "tabsmod:mushroom_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
+
+
+            Map<String, Object> cmdBlockData = new HashMap<>();
+            cmdBlockData.put("cherry_command_block_pos", cherryTeleportPos);
+            cmdBlockData.put("desert_command_block_pos", desertTeleportPos);
+            cmdBlockData.put("frozen_command_block_pos", frozenTeleportPos);
+            cmdBlockData.put("mushroom_command_block_pos", mushroomTeleportPos);
+            addEvent("command_blocks_spawn_initial", 0, cmdBlockData);
+        }
+    }
+
+    // Teleportation logic
+    private static void teleportPlayer(Level level, BlockPos commandBlockPos, String dimensionId, BlockPos originSpawnPos, BlockPos pressurePlatePos) {
+        BlockState commandBlockState = Blocks.COMMAND_BLOCK.defaultBlockState();
+        boolean setCmd = level.setBlockAndUpdate(commandBlockPos, commandBlockState);
+        BlockEntity tileEntity = level.getBlockEntity(commandBlockPos);
+        if (tileEntity instanceof CommandBlockEntity commandBlockEntity) {
+            String teleportCommand = "";
+            if (dimensionId.equals("minecraft:overworld")) {
+                teleportCommand = "/execute in minecraft:overworld run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY()) + " " + originSpawnPos.getZ();
+            } else {
+                teleportCommand = "/execute in " + dimensionId + " run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY()) + " " + originSpawnPos.getZ();
+            }
+            commandBlockEntity.getCommandBlock().setCommand(teleportCommand);
+            commandBlockEntity.setChanged();
+        }
+        // Place a pressure plate to the left of the command block in the Overworld
+        level.setBlockAndUpdate(pressurePlatePos, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
+
+        // Place a return command block and pressure plate in the target dimension
+        if (!dimensionId.equals("minecraft:overworld") && level.getServer() != null) {
+            level.getServer().execute(() -> {
+                ResourceKey<Level> targetLevelKey = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dimensionId));
+                ServerLevel targetLevel = level.getServer().getLevel(targetLevelKey);
+                if (targetLevel != null) {
+                    BlockPos returnCmdBlockPos = new BlockPos(originSpawnPos.getX() + 2, originSpawnPos.getY(), originSpawnPos.getZ() + 3);
+                    BlockPos returnPressurePlatePos = returnCmdBlockPos.west();
+
+                    BlockState returnCmdBlockState = Blocks.COMMAND_BLOCK.defaultBlockState();
+                    targetLevel.setBlockAndUpdate(returnCmdBlockPos, returnCmdBlockState);
+                    BlockEntity returnTileEntity = targetLevel.getBlockEntity(returnCmdBlockPos);
+                    if (returnTileEntity instanceof CommandBlockEntity returnCommandBlockEntity) {
+                        String returnTeleportCommand = "/execute in minecraft:overworld run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY() + 2) + " " + originSpawnPos.getZ();
+                        returnCommandBlockEntity.getCommandBlock().setCommand(returnTeleportCommand);
+                        returnCommandBlockEntity.setChanged();
+                        targetLevel.setBlockAndUpdate(returnPressurePlatePos, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
+                    }
+                }
+            });
         }
     }
 
@@ -354,17 +445,6 @@ public class Data {
                 }
                 pw.println(); // newline for clarity
             }
-
-
-
-            // Write stored intervals
-            /*if (storedIntervals != null) {
-                pw.println("Generated Intervals:");
-                for (int i = 0; i < storedIntervals.length; i++) {
-                    pw.println("Interval " + (i + 1) + ": " + storedIntervals[i] + " ms");
-                }
-                pw.println();
-            }*/
 
             // Write events
             String[] cols = { "Time", "Type", "Other Data" };
