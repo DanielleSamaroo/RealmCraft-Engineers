@@ -123,10 +123,10 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-//    public static void teleportPlayer(double x, double y, double z) {
-//        playerEntity.moveTo(x, y, z);
-//        //playerEntity.setPositionAndUpdate(x, y, z);
-//    }
+    public static void teleportPlayer(double x, double y, double z) {
+        playerEntity.moveTo(x, y, z);
+        //playerEntity.setPositionAndUpdate(x, y, z);
+    }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
         blockPositions.put("block_a", positions.get("block_a"));
@@ -207,89 +207,7 @@ public class Data {
             blockPositions.put("block_a", updated_block_a_pos_new);
             blockPositions.put("block_b", updated_block_b_pos_new);
         }
-
-        // Teleportation block placement
-        if (initialSpawn) {
-            BlockPos spawnPos = playerEntity.getOnPos();
-            Direction playerFacing = playerEntity.getDirection();
-            Direction behindPlayer = playerFacing.getOpposite();
-
-            BlockPos startBehindPos = spawnPos.relative(behindPlayer, 3);
-
-            int startX = startBehindPos.getX() - 9;
-            int zLevel = startBehindPos.getZ();
-            int groundY = lvl.getHeightmapPos(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, startBehindPos).getY();
-            int xOffset = 0;
-
-            // Cherry Dimension
-            BlockPos cherryTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
-            teleportPlayer(lvl, cherryTeleportPos, "tabsmod:cherry_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
-            xOffset++;
-
-            // Desert Dimension
-            BlockPos desertTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
-            teleportPlayer(lvl, desertTeleportPos, "tabsmod:desert_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
-            xOffset++;
-
-            // Frozen Dimension
-            BlockPos frozenTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
-            teleportPlayer(lvl, frozenTeleportPos, "tabsmod:frozen_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
-            xOffset++;
-
-            // Mushroom Dimension
-            BlockPos mushroomTeleportPos = new BlockPos(startX + xOffset * 5 + 1, groundY, zLevel); // Command block
-            teleportPlayer(lvl, mushroomTeleportPos, "tabsmod:mushroom_dimension", spawnPos, new BlockPos(startX + xOffset * 5, groundY, zLevel)); // Pressure plate
-
-
-            Map<String, Object> cmdBlockData = new HashMap<>();
-            cmdBlockData.put("cherry_command_block_pos", cherryTeleportPos);
-            cmdBlockData.put("desert_command_block_pos", desertTeleportPos);
-            cmdBlockData.put("frozen_command_block_pos", frozenTeleportPos);
-            cmdBlockData.put("mushroom_command_block_pos", mushroomTeleportPos);
-            addEvent("command_blocks_spawn_initial", 0, cmdBlockData);
         }
-    }
-
-    // Teleportation logic
-    private static void teleportPlayer(Level level, BlockPos commandBlockPos, String dimensionId, BlockPos originSpawnPos, BlockPos pressurePlatePos) {
-        BlockState commandBlockState = Blocks.COMMAND_BLOCK.defaultBlockState();
-        boolean setCmd = level.setBlockAndUpdate(commandBlockPos, commandBlockState);
-        BlockEntity tileEntity = level.getBlockEntity(commandBlockPos);
-        if (tileEntity instanceof CommandBlockEntity commandBlockEntity) {
-            String teleportCommand = "";
-            if (dimensionId.equals("minecraft:overworld")) {
-                teleportCommand = "/execute in minecraft:overworld run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY()) + " " + originSpawnPos.getZ();
-            } else {
-                teleportCommand = "/execute in " + dimensionId + " run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY()) + " " + originSpawnPos.getZ();
-            }
-            commandBlockEntity.getCommandBlock().setCommand(teleportCommand);
-            commandBlockEntity.setChanged();
-        }
-        // Place a pressure plate to the left of the command block in the Overworld
-        level.setBlockAndUpdate(pressurePlatePos, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
-
-        // Place a return command block and pressure plate in the target dimension
-        if (!dimensionId.equals("minecraft:overworld") && level.getServer() != null) {
-            level.getServer().execute(() -> {
-                ResourceKey<Level> targetLevelKey = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(dimensionId));
-                ServerLevel targetLevel = level.getServer().getLevel(targetLevelKey);
-                if (targetLevel != null) {
-                    BlockPos returnCmdBlockPos = new BlockPos(originSpawnPos.getX() + 2, originSpawnPos.getY(), originSpawnPos.getZ() + 3);
-                    BlockPos returnPressurePlatePos = returnCmdBlockPos.west();
-
-                    BlockState returnCmdBlockState = Blocks.COMMAND_BLOCK.defaultBlockState();
-                    targetLevel.setBlockAndUpdate(returnCmdBlockPos, returnCmdBlockState);
-                    BlockEntity returnTileEntity = targetLevel.getBlockEntity(returnCmdBlockPos);
-                    if (returnTileEntity instanceof CommandBlockEntity returnCommandBlockEntity) {
-                        String returnTeleportCommand = "/execute in minecraft:overworld run teleport @p " + originSpawnPos.getX() + " " + (originSpawnPos.getY() + 2) + " " + originSpawnPos.getZ();
-                        returnCommandBlockEntity.getCommandBlock().setCommand(returnTeleportCommand);
-                        returnCommandBlockEntity.setChanged();
-                        targetLevel.setBlockAndUpdate(returnPressurePlatePos, Blocks.STONE_PRESSURE_PLATE.defaultBlockState());
-                    }
-                }
-            });
-        }
-    }
 
     /*public static void respawnBlocks(Level lvl, boolean initialSpawn, BlockBroken blockBroken) {
         BlockPos playerPos = playerEntity.blockPosition();
@@ -360,13 +278,15 @@ public class Data {
     public static void addEvent(String type, long time, Map<String, Object> data) {
         boolean dev = TabsMod.getDev();
         if (!dev) {
-            Event evt = new Event(type, time, data);
+            int currentPhase = Timer.currentPhase();
+            Event evt = new Event(type, time, currentPhase, data);
 
             // Print to log
             System.out.println("-----------------------------------------");
             System.out.println("Event Type: " + evt.getType());
             System.out.println("Time: " + evt.getTime());
             System.out.println("Data: " + evt.getDataString());
+            System.out.println("Current Phase: " + currentPhase);
             System.out.println("-----------------------------------------");
 
             evts.add(evt);
@@ -376,15 +296,17 @@ public class Data {
     public static void addEvent(String type, long time) {
         boolean dev = TabsMod.getDev();
         if (!dev) {
-            Event evt = new Event(type, time);
+            int currentPhase = Timer.currentPhase();
+            Event evt = new Event(type, time, currentPhase);
 
             // Print to log
             System.out.println("-----------------------------------------");
             System.out.println("Event Type: " + evt.getType());
             System.out.println("Time: " + evt.getTime());
+            System.out.println("Current Phase: " + currentPhase);
             System.out.println("-----------------------------------------");
 
-            evts.add(new Event(type, time));
+            evts.add(new Event(type, time, currentPhase));
         }
     }
 
@@ -447,7 +369,7 @@ public class Data {
             }
 
             // Write events
-            String[] cols = { "Time", "Type", "Other Data" };
+            String[] cols = { "Time", "Type", "Current Phase", "Other Data" };
             pw.println(String.join(",", cols));
 
             for (Event evt : evts) {
