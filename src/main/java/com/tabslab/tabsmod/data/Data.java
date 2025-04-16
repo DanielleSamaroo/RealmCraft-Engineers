@@ -359,6 +359,7 @@ public class Data {
 
             // Add headers
             pw.println("Player Name: " + playerName);
+            pw.println();
 
             if (storedViIntervals != null && !storedViIntervals.isEmpty()) {
                 pw.println("Generated Intervals (ms):");
