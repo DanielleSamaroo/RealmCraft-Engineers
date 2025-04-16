@@ -419,8 +419,6 @@ public class ClientEvents {
             }
         }
 
-
-
         @SubscribeEvent
         public static void onKeyPress(InputEvent.Key event) {
             long time = Timer.timeElapsed();
@@ -428,11 +426,18 @@ public class ClientEvents {
             int action = event.getAction();
 
             if (action == GLFW.GLFW_PRESS) {
-                Map<String, Object> data = new HashMap<>();
-                data.put("key", key);
-                Data.addEvent("key_press", time, data);
+                String keyName = GLFW.glfwGetKeyName(key, 0);
+
+                if (keyName != null) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("key", keyName);
+                    Data.addEvent("key_press", time, data);
+                } else {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("key", key);
+                    Data.addEvent("key_press", time, data);
+                }
             }
         }
-
     }
 }
