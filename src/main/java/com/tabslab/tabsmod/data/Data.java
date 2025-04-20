@@ -10,15 +10,13 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.CommandBlockEntity;
-import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
@@ -123,9 +121,30 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-    public static void teleportPlayer(double x, double y, double z) {
-        playerEntity.moveTo(x, y, z);
-        //playerEntity.setPositionAndUpdate(x, y, z);
+    // public static void teleportPlayer(double x, double y, double z) {
+    //     playerEntity.moveTo(x, y, z);
+    //     //playerEntity.setPositionAndUpdate(x, y, z);
+    // }
+
+    public static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> destinationDimension, Vec3 targetPos) {
+        MinecraftServer server = player.getServer();
+        if (server != null && destinationDimension != null) {
+            ServerLevel destinationLevel = server.getLevel(destinationDimension);
+            if (destinationLevel != null) {
+                if (targetPos != null) {
+                    playerOriginPositions.put(player.getUUID(), targetPos);
+                    player.teleportTo(destinationLevel, targetPos.x, targetPos.y, targetPos.z, player.getYRot(), player.getXRot());
+                } else {
+                    player.changeDimension(destinationLevel); // fallback if target position is null
+                }
+            } else {
+                System.err.println("Error: Destination dimension is null!");
+            }
+        } else {
+            if (server == null) System.err.println("Error: MinecraftServer instance is null!");
+            if (player == null) System.err.println("Error: ServerPlayer instance is null!");
+            if (destinationDimension == null) System.err.println("Error: Destination dimension key is null!");
+        }
     }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
