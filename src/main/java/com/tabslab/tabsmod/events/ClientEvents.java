@@ -14,6 +14,12 @@ import com.tabslab.tabsmod.init.ItemInit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -21,6 +27,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -42,11 +49,15 @@ import net.minecraft.world.entity.Mob;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class ClientEvents {
     private static boolean initialBlockBreak;
     private static Vec3 lastPosition = new Vec3(0, 0, 0);
     private static List<Long> intervals;
+    private static final Map<UUID, Boolean> hasTeleportedPhase2 = new HashMap<>();
+    private static final Map<UUID, Boolean> hasTeleportedPhase3 = new HashMap<>();
+
 
     @Mod.EventBusSubscriber(bus=Mod.EventBusSubscriber.Bus.MOD, modid=TabsMod.MODID, value=Dist.CLIENT)
     public static class ClientModBusEvents {
@@ -68,11 +79,94 @@ public class ClientEvents {
         // tick is unit of time within game's update cycle
         @SubscribeEvent
         public static void onTicks(TickEvent.PlayerTickEvent event) {
-            if (Timer.hasPhaseChanged() && initialBlockBreak) {
-                Timer.newIntervals();
-                Timer.startViTimer(); // "restart" Vi Timer on phase change
+            // teleportation
+            if (!event.player.level.isClientSide()) {
+                ServerPlayer player = (ServerPlayer) event.player;
+                UUID playerId = player.getUUID();
+                MinecraftServer server = player.getServer();
+                Vec3 originPos = player.position();
+                int currentPhase = Timer.currentPhase();
+
+                // Phase 2: Desert
+                if (currentPhase == 2 && !hasTeleportedPhase2.getOrDefault(playerId, false)) {
+
+                    ResourceKey<Level> desertDimensionKey = ResourceKey.create(
+                            Registries.DIMENSION,
+                            new ResourceLocation(TabsMod.MODID, "desert_dimension")
+                    );
+                    ServerLevel targetLevel = server.getLevel(desertDimensionKey);
+
+                    if (targetLevel != null) {
+                        int x = (int) originPos.x;
+                        int z = (int) originPos.z;
+
+                        int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                        BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
+
+                        // Check downward for a solid block
+                        while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
+                            groundCheck.move(0, -1, 0);
+                        }
+
+                        int safeY = groundCheck.getY() + 4;
+
+                        if (safeY <= targetLevel.getMinBuildHeight()) {
+                            safeY = 64;
+                        }
+
+                        Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
+                        Data.teleportPlayerToDimension(player, desertDimensionKey, targetVec);
+                        hasTeleportedPhase2.put(playerId, true);
+                    }
+
+                    // Phase 3: Frozen
+                } else if (currentPhase == 3 && !hasTeleportedPhase3.getOrDefault(playerId, false)) {
+
+                    ResourceKey<Level> frozenDimensionKey = ResourceKey.create(
+                            Registries.DIMENSION,
+                            new ResourceLocation(TabsMod.MODID, "frozen_dimension")
+                    );
+                    ServerLevel targetLevel = server.getLevel(frozenDimensionKey);
+
+                    if (targetLevel != null) {
+                        int x = (int) originPos.x;
+                        int z = (int) originPos.z;
+
+                        int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                        BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
+
+                        // Check downward for a solid block
+                        while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
+                            groundCheck.move(0, -1, 0);
+                        }
+
+                        int safeY = groundCheck.getY() + 4;
+
+                        if (safeY <= targetLevel.getMinBuildHeight()) {
+                            safeY = 64;
+                        }
+
+                        Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
+                        Data.teleportPlayerToDimension(player, frozenDimensionKey, targetVec);
+                        hasTeleportedPhase3.put(playerId, true);
+                    }
+
+                    // Reset teleport flags
+                    if (currentPhase < 2) {
+                        hasTeleportedPhase2.remove(playerId);
+                    }
+                    if (currentPhase < 3) {
+                        hasTeleportedPhase3.remove(playerId);
+                    }
+                }
+
+                if (Timer.hasPhaseChanged() && initialBlockBreak) {
+                    Timer.newIntervals();
+                    Timer.startViTimer(); // "restart" Vi Timer on phase change
+                }
             }
         }
+
 
         @SubscribeEvent
         public static void onItemPickup(PlayerEvent.ItemPickupEvent event) {
@@ -120,7 +214,7 @@ public class ClientEvents {
                 if (!Timer.timerStarted()) {
                     Timer.startTimer();  // Start the timer on first block break
                 }
-                
+
                 //  if the first block is broken, start interval schedule for each phase
                 if (!initialBlockBreak) {
                     initialBlockBreak = true;
