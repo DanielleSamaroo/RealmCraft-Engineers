@@ -103,7 +103,6 @@ public class ClientEvents {
                         int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
                         BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
 
-                        // Check downward for a solid block
                         while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
                             groundCheck.move(0, -1, 0);
                         }
@@ -117,6 +116,8 @@ public class ClientEvents {
                         Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
                         Data.teleportPlayerToDimension(player, desertDimensionKey, targetVec);
                         hasTeleportedPhase2.put(playerId, true);
+
+                        Data.respawnBlocks(targetLevel, false, BlockBroken.Neither);
                     }
 
                     // Phase 3: Frozen
@@ -135,7 +136,6 @@ public class ClientEvents {
                         int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
                         BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
 
-                        // Check downward for a solid block
                         while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
                             groundCheck.move(0, -1, 0);
                         }
@@ -149,9 +149,10 @@ public class ClientEvents {
                         Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
                         Data.teleportPlayerToDimension(player, frozenDimensionKey, targetVec);
                         hasTeleportedPhase3.put(playerId, true);
+
+                        Data.respawnBlocks(targetLevel, false, BlockBroken.Neither);
                     }
 
-                    // Reset teleport flags
                     if (currentPhase < 2) {
                         hasTeleportedPhase2.remove(playerId);
                     }
