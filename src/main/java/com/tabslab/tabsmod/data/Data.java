@@ -41,7 +41,7 @@ public class Data {
     private static double meanIntervalValue = 2000.0; // mean interval value in ms (2s)
     private static int numberOfSteps = 10; // total number of intervals (steps)
     private static double probability = .5; // probability of reinforcement
-
+    private static final Map<UUID, Vec3> playerOriginPositions = new HashMap<>();
 
     public static void setParameters(double sec, int steps, double prob) {
         Data.meanIntervalValue = sec;
@@ -135,7 +135,7 @@ public class Data {
                     playerOriginPositions.put(player.getUUID(), targetPos);
                     player.teleportTo(destinationLevel, targetPos.x, targetPos.y, targetPos.z, player.getYRot(), player.getXRot());
                 } else {
-                    player.changeDimension(destinationLevel); // fallback if target position is null
+                    player.changeDimension(destinationLevel);
                 }
             } else {
                 System.err.println("Error: Destination dimension is null!");
@@ -145,6 +145,14 @@ public class Data {
             if (player == null) System.err.println("Error: ServerPlayer instance is null!");
             if (destinationDimension == null) System.err.println("Error: Destination dimension key is null!");
         }
+    }
+
+    public static Vec3 getOriginPosition(ServerPlayer player) {
+        return playerOriginPositions.get(player.getUUID());
+    }
+
+    public static void clearOriginPosition(ServerPlayer player) {
+        playerOriginPositions.remove(player.getUUID());
     }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
@@ -177,6 +185,12 @@ public class Data {
                 int phase = Timer.currentPhase();
                 lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
                 lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
+
+                // spawn blocks in other biomes
+                if (blockBroken != BlockBroken.Neither) {
+                    lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
+                    lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
+                }
             }
 
             // Get the chunks where block_a and block_b are located
