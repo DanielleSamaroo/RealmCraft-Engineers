@@ -14,7 +14,13 @@ import com.tabslab.tabsmod.init.ItemInit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -22,6 +28,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -40,6 +47,7 @@ import net.minecraft.world.entity.Mob;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class ClientEvents {
     private static boolean correctBlockHit = false;
@@ -54,6 +62,8 @@ public class ClientEvents {
     private static boolean reinforcementStarted = false;
     private static boolean waitingForCorrectClickPostVi = false;
     private static boolean waitingForCoinPickupAfterVi = false;
+    private static final Map<UUID, Boolean> hasTeleportedPhase2 = new HashMap<>();
+    private static final Map<UUID, Boolean> hasTeleportedPhase3 = new HashMap<>();
 
     private static void spawnCoin(Level level, Player player) {
         if (level.isClientSide) return;
@@ -186,6 +196,89 @@ public class ClientEvents {
 
 
             viWasRunningLastTick = viRunningNow;
+
+            // teleportation
+            if (!event.player.level.isClientSide()) {
+                ServerPlayer player = (ServerPlayer) event.player;
+                UUID playerId = player.getUUID();
+                MinecraftServer server = player.getServer();
+                Vec3 originPos = player.position();
+                int currentPhase = Timer.currentPhase();
+
+                // Phase 2: Desert
+                if (currentPhase == 2 && !hasTeleportedPhase2.getOrDefault(playerId, false) && Data.allowPhaseTeleport) {
+
+                    ResourceKey<Level> desertDimensionKey = ResourceKey.create(
+                            Registries.DIMENSION,
+                            new ResourceLocation(TabsMod.MODID, "desert_dimension")
+                    );
+                    ServerLevel targetLevel = server.getLevel(desertDimensionKey);
+
+                    if (targetLevel != null) {
+                        int x = (int) originPos.x;
+                        int z = (int) originPos.z;
+
+                        int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                        BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
+
+                        while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
+                            groundCheck.move(0, -1, 0);
+                        }
+
+                        int safeY = groundCheck.getY() + 4;
+
+                        if (safeY <= targetLevel.getMinBuildHeight()) {
+                            safeY = 64;
+                        }
+
+                        Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
+                        Data.teleportPlayerToDimension(player, desertDimensionKey, targetVec);
+                        hasTeleportedPhase2.put(playerId, true);
+
+                        Data.respawnBlocks(targetLevel, false, BlockBroken.Neither);
+                    }
+
+                    // Phase 3: Frozen
+                } else if (currentPhase == 3 && !hasTeleportedPhase3.getOrDefault(playerId, false) && Data.allowPhaseTeleport) {
+
+                    ResourceKey<Level> frozenDimensionKey = ResourceKey.create(
+                            Registries.DIMENSION,
+                            new ResourceLocation(TabsMod.MODID, "frozen_dimension")
+                    );
+                    ServerLevel targetLevel = server.getLevel(frozenDimensionKey);
+
+                    if (targetLevel != null) {
+                        int x = (int) originPos.x;
+                        int z = (int) originPos.z;
+
+                        int surfaceY = targetLevel.getHeight(Heightmap.Types.WORLD_SURFACE, x, z);
+                        BlockPos.MutableBlockPos groundCheck = new BlockPos.MutableBlockPos(x, surfaceY, z);
+
+                        while (groundCheck.getY() > targetLevel.getMinBuildHeight() && targetLevel.getBlockState(groundCheck).isAir()) {
+                            groundCheck.move(0, -1, 0);
+                        }
+
+                        int safeY = groundCheck.getY() + 4;
+
+                        if (safeY <= targetLevel.getMinBuildHeight()) {
+                            safeY = 64;
+                        }
+
+                        Vec3 targetVec = new Vec3(x + 0.5, safeY, z + 0.5);
+                        Data.teleportPlayerToDimension(player, frozenDimensionKey, targetVec);
+                        hasTeleportedPhase3.put(playerId, true);
+
+                        Data.respawnBlocks(targetLevel, false, BlockBroken.Neither);
+                    }
+
+                    if (currentPhase < 2) {
+                        hasTeleportedPhase2.remove(playerId);
+                    }
+                    if (currentPhase < 3) {
+                        hasTeleportedPhase3.remove(playerId);
+                    }
+                }
+            }
         }
 
         @SubscribeEvent
@@ -518,9 +611,17 @@ public class ClientEvents {
             int action = event.getAction();
 
             if (action == GLFW.GLFW_PRESS) {
-                Map<String, Object> data = new HashMap<>();
-                data.put("key", key);
-                Data.addEvent("key_press", time, data);
+                String keyName = GLFW.glfwGetKeyName(key, 0);
+
+                if (keyName != null) {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("key", keyName);
+                    Data.addEvent("key_press", time, data);
+                } else {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("key", key);
+                    Data.addEvent("key_press", time, data);
+                }
             }
 
             // FOR TESTING
