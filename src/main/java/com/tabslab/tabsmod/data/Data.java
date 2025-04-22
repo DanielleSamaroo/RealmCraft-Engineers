@@ -4,6 +4,10 @@ import com.tabslab.tabsmod.TabsMod;
 import com.tabslab.tabsmod.exp.Timer;
 import com.tabslab.tabsmod.init.BlockInit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -29,6 +33,9 @@ public class Data {
     private static double meanIntervalValue = 2000.0;
     private static int numberOfSteps = 10;
     private static double probability = .5;
+    private static final Map<UUID, Vec3> playerOriginPositions = new HashMap<>();
+    public static boolean allowPhaseTeleport = false; // false = disabled teleportation
+
 
     public static void setParameters(double sec, int steps, double prob) {
         Data.meanIntervalValue = sec;
@@ -107,8 +114,38 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-    public static void teleportPlayer(double x, double y, double z) {
-        playerEntity.moveTo(x, y, z);
+    public static void setAllowPhaseTeleport(boolean allow) {
+        allowPhaseTeleport = allow;
+        System.out.println("DEBUG: allowPhaseTeleport set to " + allow);
+    }
+
+    public static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> destinationDimension, Vec3 targetPos) {
+        MinecraftServer server = player.getServer();
+        if (server != null && destinationDimension != null) {
+            ServerLevel destinationLevel = server.getLevel(destinationDimension);
+            if (destinationLevel != null) {
+                if (targetPos != null) {
+                    playerOriginPositions.put(player.getUUID(), targetPos);
+                    player.teleportTo(destinationLevel, targetPos.x, targetPos.y, targetPos.z, player.getYRot(), player.getXRot());
+                } else {
+                    player.changeDimension(destinationLevel); // fallback if target position is null
+                }
+            } else {
+                System.err.println("Error: Destination dimension is null!");
+            }
+        } else {
+            if (server == null) System.err.println("Error: MinecraftServer instance is null!");
+            if (player == null) System.err.println("Error: ServerPlayer instance is null!");
+            if (destinationDimension == null) System.err.println("Error: Destination dimension key is null!");
+        }
+    }
+
+    public static Vec3 getOriginPosition(ServerPlayer player) {
+        return playerOriginPositions.get(player.getUUID());
+    }
+
+    public static void clearOriginPosition(ServerPlayer player) {
+        playerOriginPositions.remove(player.getUUID());
     }
 
     public static void setBlockPositions(Map<String, BlockPos> positions) {
@@ -140,6 +177,11 @@ public class Data {
                 int phase = Timer.currentPhase();
                 boolean canDestroyA = phase == 1 && blockBroken == BlockBroken.BlockA && Timer.viTimeRemaining() == 0;
                 boolean canDestroyB = phase == 2 && blockBroken == BlockBroken.BlockB && Timer.viTimeRemaining() == 0;
+
+                if (blockBroken != BlockBroken.Neither) {
+                    lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
+                    lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
+                }
 
                 lvl.destroyBlock(block_a_pos, canDestroyA);
                 lvl.destroyBlock(block_b_pos, canDestroyB);
@@ -228,12 +270,15 @@ public class Data {
     public static void addEvent(String type, long time, Map<String, Object> data) {
         boolean dev = TabsMod.getDev();
         if (!dev) {
-            Event evt = new Event(type, time, data);
+            int currentPhase = Timer.currentPhase();
+            Event evt = new Event(type, time, currentPhase, data);
 
+            // Print to log
             System.out.println("-----------------------------------------");
             System.out.println("Event Type: " + evt.getType());
             System.out.println("Time: " + evt.getTime());
             System.out.println("Data: " + evt.getDataString());
+            System.out.println("Current Phase: " + currentPhase);
             System.out.println("-----------------------------------------");
 
             evts.add(evt);
@@ -243,14 +288,16 @@ public class Data {
     public static void addEvent(String type, long time) {
         boolean dev = TabsMod.getDev();
         if (!dev) {
-            Event evt = new Event(type, time);
+            int currentPhase = Timer.currentPhase();
+            Event evt = new Event(type, time, currentPhase);
 
             System.out.println("-----------------------------------------");
             System.out.println("Event Type: " + evt.getType());
             System.out.println("Time: " + evt.getTime());
+            System.out.println("Current Phase: " + currentPhase);
             System.out.println("-----------------------------------------");
 
-            evts.add(new Event(type, time));
+            evts.add(new Event(type, time, currentPhase));
         }
     }
 
@@ -300,6 +347,7 @@ public class Data {
             pw.println();
 
             pw.println("Player Name: " + playerName);
+            pw.println();
 
             if (storedViIntervals != null && !storedViIntervals.isEmpty()) {
                 pw.println("Generated Intervals (ms):");
@@ -309,7 +357,7 @@ public class Data {
                 pw.println();
             }
 
-            String[] cols = { "Time", "Type", "Other Data" };
+            String[] cols = { "Time", "Type", "Current Phase", "Other Data" };
             pw.println(String.join(",", cols));
 
             for (Event evt : evts) {
