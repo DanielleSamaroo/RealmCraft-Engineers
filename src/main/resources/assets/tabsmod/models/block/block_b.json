@@ -1,0 +1,8 @@
+{
+  "parent": "block/cube_bottom_top",
+  "textures": {
+    "bottom": "tabsmod:block/white",
+    "top": "tabsmod:block/white",
+    "side": "tabsmod:block/heart"
+  }
+}
