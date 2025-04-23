@@ -1,30 +1,22 @@
 package com.tabslab.tabsmod.data;
 
 import com.tabslab.tabsmod.TabsMod;
-import com.tabslab.tabsmod.exp.ExpHud;
 import com.tabslab.tabsmod.exp.Timer;
 import com.tabslab.tabsmod.init.BlockInit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
-
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.TimeZone;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -38,10 +30,14 @@ public class Data {
     private static Entity playerEntity;
     public static long sessionStartTime = 0;
     private static long sessionEndTime = 0;
-    private static double meanIntervalValue = 2000.0; // mean interval value in ms (2s)
-    private static int numberOfSteps = 10; // total number of intervals (steps)
-    private static double probability = .5; // probability of reinforcement
+    private static double meanIntervalValue = 2000.0;
+    private static int numberOfSteps = 10;
+    private static double probability = .5;
     private static final Map<UUID, Vec3> playerOriginPositions = new HashMap<>();
+    //public static boolean allowPhaseTeleport = true; // false = disabled teleportation
+    public static Map<Integer, Double> phaseDistanceMap = new HashMap<>();
+    public static Vec3 lastRecordedPosition = null;
+
 
     public static void setParameters(double sec, int steps, double prob) {
         Data.meanIntervalValue = sec;
@@ -106,7 +102,6 @@ public class Data {
             Data.addEvent("interval_generated", Timer.timeElapsed(), data);
         }
 
-
         // return the list of total interval times
         return intervalDurations;
     }
@@ -121,10 +116,10 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-    // public static void teleportPlayer(double x, double y, double z) {
-    //     playerEntity.moveTo(x, y, z);
-    //     //playerEntity.setPositionAndUpdate(x, y, z);
-    // }
+//    public static void setAllowPhaseTeleport(boolean allow) {
+//        allowPhaseTeleport = allow;
+//        System.out.println("DEBUG: allowPhaseTeleport set to " + allow);
+//    }
 
     public static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> destinationDimension, Vec3 targetPos) {
         MinecraftServer server = player.getServer();
@@ -135,7 +130,7 @@ public class Data {
                     playerOriginPositions.put(player.getUUID(), targetPos);
                     player.teleportTo(destinationLevel, targetPos.x, targetPos.y, targetPos.z, player.getYRot(), player.getXRot());
                 } else {
-                    player.changeDimension(destinationLevel);
+                    player.changeDimension(destinationLevel); // fallback if target position is null
                 }
             } else {
                 System.err.println("Error: Destination dimension is null!");
@@ -172,8 +167,7 @@ public class Data {
 
         boolean dev = TabsMod.getDev();
         if (!dev) {
-            // First, remove old blocks if it isn't the initial level
-
+            // remove old blocks
             BlockPos block_a_pos = blockPositions.get("block_a");
             BlockPos block_b_pos = blockPositions.get("block_b");
 
@@ -183,14 +177,16 @@ public class Data {
             } else {
                 // Give coins
                 int phase = Timer.currentPhase();
-                lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
-                lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
+                boolean canDestroyA = phase == 1 && blockBroken == BlockBroken.BlockA && Timer.viTimeRemaining() == 0;
+                boolean canDestroyB = phase == 2 && blockBroken == BlockBroken.BlockB && Timer.viTimeRemaining() == 0;
 
-                // spawn blocks in other biomes
                 if (blockBroken != BlockBroken.Neither) {
                     lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
                     lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
                 }
+
+                lvl.destroyBlock(block_a_pos, canDestroyA);
+                lvl.destroyBlock(block_b_pos, canDestroyB);
             }
 
             // Get the chunks where block_a and block_b are located
@@ -210,10 +206,33 @@ public class Data {
             int yPos = playerPos.getY();
             int zPos = playerPos.getZ();
 
-            // Respawns blocks to be at an equidistant position from player
-            // block a on left and block b on right ( *** adjust x pos *** )
-            BlockPos updated_block_a_pos_new = new BlockPos(xPos + 3, yPos + 1, zPos + 6);
-            BlockPos updated_block_b_pos_new = new BlockPos(xPos - 3, yPos + 1, zPos + 6);
+            // Get direction the player is facing
+            Vec3 lookVec = playerEntity.getLookAngle().normalize();
+
+            double sideOffset = 3.0;      // *** adjust distance to the left and right ***
+            double distanceForward = 6.0; // *** adjust distance in front of player ***
+            double verticalOffset = 1.0;  // how high it is off the ground (should stay at 1)
+
+            // Forward offset from player
+            double fx = lookVec.x * distanceForward;
+            double fz = lookVec.z * distanceForward;
+
+            // Get right vector (90° rotated horizontal vector)
+            Vec3 rightVec = new Vec3(-lookVec.z, 0, lookVec.x).normalize();
+
+            // Block A respawn pos
+            BlockPos updated_block_a_pos_new = new BlockPos(
+                    xPos + fx - rightVec.x * sideOffset,
+                    yPos + verticalOffset,
+                    zPos + fz - rightVec.z * sideOffset
+            );
+
+            // Block B respawn pos
+            BlockPos updated_block_b_pos_new = new BlockPos(
+                    xPos + fx + rightVec.x * sideOffset,
+                    yPos + verticalOffset,
+                    zPos + fz + rightVec.z * sideOffset
+            );
 
             // Place the blocks at the new random positions
             BlockState blockStateA = BlockInit.BLOCK_A.get().defaultBlockState();
@@ -240,70 +259,12 @@ public class Data {
             blockPositions.put("block_a", updated_block_a_pos_new);
             blockPositions.put("block_b", updated_block_b_pos_new);
         }
-        }
-
-    /*public static void respawnBlocks(Level lvl, boolean initialSpawn, BlockBroken blockBroken) {
-        BlockPos playerPos = playerEntity.blockPosition();
-        Random random = new Random();
-        Vec3 direction = Vec3.directionFromRotation(0, random.nextInt(360));
-        double distance = 10.0; // Distance from player
-
-        // Calculate new positions for block A and block B
-        BlockPos blockAPos = new BlockPos(
-                playerPos.getX() + direction.x * distance,
-                playerPos.getY(),
-                playerPos.getZ() + direction.z * distance
-        );
-
-        // Ensure block B is exactly 4 blocks away from block A in one direction
-        Vec3 directionB = direction.yRot((float) Math.PI / 2); // Rotate 90 degrees to original direction for simplicity
-        BlockPos blockBPos = new BlockPos(
-                blockAPos.getX() + directionB.x * 4,
-                blockAPos.getY(),
-                blockAPos.getZ() + directionB.z * 4
-        );
-
-        // Destroy old blocks if they exist, considering the phase
-        if (!initialSpawn) {
-            int phase = Timer.currentPhase();
-            lvl.destroyBlock(Data.getBlockAPos(), phase == 1 && blockBroken == BlockBroken.BlockA);
-            lvl.destroyBlock(Data.getBlockBPos(), phase == 2 && blockBroken == BlockBroken.BlockB);
-        }
-
-        // Place new blocks
-        BlockState blockStateA = BlockInit.BLOCK_A.get().defaultBlockState();
-        BlockState blockStateB = BlockInit.BLOCK_B.get().defaultBlockState();
-        boolean setA = lvl.setBlockAndUpdate(blockAPos, blockStateA);
-        boolean setB = lvl.setBlockAndUpdate(blockBPos, blockStateB);
-
-        // Log the event
-        Map<String, Object> data = new HashMap<>();
-        data.put("block_a_spawn", blockAPos);
-        data.put("block_a_set", setA);
-        data.put("block_b_spawn", blockBPos);
-        data.put("block_b_set", setB);
-        long time = Timer.timeElapsed();
-        if (initialSpawn) {
-            Data.addEvent("blocks_spawn_initial", time, data);
-        } else {
-            Data.addEvent("blocks_spawn", time, data);
-        }
-
-        // Check if stimulus point is reached and increment coins
-        if (Timer.isStimulusReached()) {
-            ExpHud.incrementCoins();
-        }
-
-        // Update the stored block positions
-        Data.blockPositions.put("block_a", blockAPos);
-        Data.blockPositions.put("block_b", blockBPos);
-    }*/
-
+    }
 
     private static void removeAllBlocks(Level lvl, Block targetBlock) {
         for (BlockPos pos : BlockPos.betweenClosed(lvl.getMinBuildHeight(), 0, lvl.getMinBuildHeight(), lvl.getMaxBuildHeight(), 255, lvl.getMaxBuildHeight())) {
             if (lvl.getBlockState(pos).getBlock() == targetBlock) {
-                lvl.destroyBlock(pos, true); // Drop the block as an item
+                lvl.destroyBlock(pos, true);
             }
         }
     }
@@ -332,7 +293,6 @@ public class Data {
             int currentPhase = Timer.currentPhase();
             Event evt = new Event(type, time, currentPhase);
 
-            // Print to log
             System.out.println("-----------------------------------------");
             System.out.println("Event Type: " + evt.getType());
             System.out.println("Time: " + evt.getTime());
@@ -377,20 +337,17 @@ public class Data {
         File file = new File(playerName + ".csv");
 
         try(PrintWriter pw = new PrintWriter(file)) {
-            // Get date, start time, and end time
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
             dateFormat.setTimeZone(TimeZone.getDefault());
             String startTimeStr = dateFormat.format(new Date(sessionStartTime));
             String endTimeStr = dateFormat.format(new Date(sessionEndTime));
             String timeZoneStr = new SimpleDateFormat("HH:mm:ss z").format(new Date(sessionEndTime));
 
-            // Write session info at the beginning of CSV
             pw.println("Start: " + startTimeStr);
             pw.println("End: " + endTimeStr);
             pw.println(timeZoneStr);
             pw.println();
 
-            // Add headers
             pw.println("Player Name: " + playerName);
             pw.println();
 
@@ -399,10 +356,15 @@ public class Data {
                 for (int i = 0; i < storedViIntervals.size(); i++) {
                     pw.println("Interval " + (i + 1) + ": " + storedViIntervals.get(i));
                 }
-                pw.println(); // newline for clarity
+                pw.println();
             }
 
-            // Write events
+            pw.println("Distance Traveled:");
+            for (Map.Entry<Integer, Double> entry : Data.phaseDistanceMap.entrySet()) {
+                pw.println("Phase " + entry.getKey() + ": " + entry.getValue() + " units");
+            }
+            pw.println();
+
             String[] cols = { "Time", "Type", "Current Phase", "Other Data" };
             pw.println(String.join(",", cols));
 
@@ -410,7 +372,6 @@ public class Data {
                 pw.println(evt.toCSV());
             }
 
-            // Close connection
             pw.close();
 
             System.out.println("-----------------------------------------");
@@ -425,6 +386,5 @@ public class Data {
             System.out.println(e.getMessage());
             System.out.println("-----------------------------------------");
         }
-
     }
 }
