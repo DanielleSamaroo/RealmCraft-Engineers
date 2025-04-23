@@ -35,6 +35,8 @@ public class Data {
     private static double probability = .5;
     private static final Map<UUID, Vec3> playerOriginPositions = new HashMap<>();
     public static boolean allowPhaseTeleport = false; // false = disabled teleportation
+    public static Map<Integer, Double> phaseDistanceMap = new HashMap<>();
+    public static Vec3 lastRecordedPosition = null;
 
 
     public static void setParameters(double sec, int steps, double prob) {
@@ -128,7 +130,7 @@ public class Data {
                     playerOriginPositions.put(player.getUUID(), targetPos);
                     player.teleportTo(destinationLevel, targetPos.x, targetPos.y, targetPos.z, player.getYRot(), player.getXRot());
                 } else {
-                    player.changeDimension(destinationLevel); // fallback if target position is null
+                    player.changeDimension(destinationLevel);
                 }
             } else {
                 System.err.println("Error: Destination dimension is null!");
@@ -177,7 +179,8 @@ public class Data {
                 int phase = Timer.currentPhase();
                 boolean canDestroyA = phase == 1 && blockBroken == BlockBroken.BlockA && Timer.viTimeRemaining() == 0;
                 boolean canDestroyB = phase == 2 && blockBroken == BlockBroken.BlockB && Timer.viTimeRemaining() == 0;
-
+                
+                // makes sure blocks are all biomes
                 if (blockBroken != BlockBroken.Neither) {
                     lvl.destroyBlock(block_a_pos, phase == 1 && blockBroken == BlockBroken.BlockA);
                     lvl.destroyBlock(block_b_pos, phase == 2 && blockBroken == BlockBroken.BlockB);
@@ -356,6 +359,12 @@ public class Data {
                 }
                 pw.println();
             }
+
+            pw.println("Distance Traveled:");
+            for (Map.Entry<Integer, Double> entry : Data.phaseDistanceMap.entrySet()) {
+                pw.println("Phase " + entry.getKey() + ": " + entry.getValue() + " units");
+            }
+            pw.println();
 
             String[] cols = { "Time", "Type", "Current Phase", "Other Data" };
             pw.println(String.join(",", cols));
