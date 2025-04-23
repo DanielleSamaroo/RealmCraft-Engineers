@@ -323,7 +323,7 @@ public class ClientEvents {
                             (currentPhase == 3 && phaseThreeReinforcement && block.equals(BlockInit.BLOCK_B.get()))) {
                         spawnCoin(event.getPlayer().level, event.getPlayer());
                     } else {
-                        ExpHud.incrementPts(-0.05);
+                        ExpHud.incrementPts(0);
                         Timer.resumeTimer();
                         Timer.nextViInterval();
                     }
@@ -354,13 +354,13 @@ public class ClientEvents {
                             if (block.equals(BlockInit.BLOCK_A.get())) {
                                 ExpHud.incrementPts(.05);
                             } else if (block.equals(BlockInit.BLOCK_B.get())) {
-                                ExpHud.incrementPts(-.05);
+                                ExpHud.incrementPts(0);
                             }
                         } else {
                             if (block.equals(BlockInit.BLOCK_A.get())) {
                                 correctBlockHit = true;
                             } else if (block.equals(BlockInit.BLOCK_B.get())) {
-                                ExpHud.incrementPts(-.05);
+                                ExpHud.incrementPts(0);
                             }
                         }
                     }
@@ -369,13 +369,13 @@ public class ClientEvents {
                             if (block.equals(BlockInit.BLOCK_B.get())) {
                                 ExpHud.incrementPts(.05);
                             } else if (block.equals(BlockInit.BLOCK_A.get())) {
-                                ExpHud.incrementPts(-.05);
+                                ExpHud.incrementPts(0);
                             }
                         } else {
                             if (block.equals(BlockInit.BLOCK_B.get())) {
                                 correctBlockHit = true;
                             } else if (block.equals(BlockInit.BLOCK_A.get())) {
-                                ExpHud.incrementPts(-.05);
+                                ExpHud.incrementPts(0);
                             }
                         }
                     }
@@ -385,13 +385,13 @@ public class ClientEvents {
                                 if (block.equals(BlockInit.BLOCK_B.get())) {
                                     ExpHud.incrementPts(.05);
                                 } else if (block.equals(BlockInit.BLOCK_A.get())) {
-                                    ExpHud.incrementPts(-.05);
+                                    ExpHud.incrementPts(0);
                                 }
                             } else {
                                 if (block.equals(BlockInit.BLOCK_B.get())) {
                                     correctBlockHit = true;
                                 } else if (block.equals(BlockInit.BLOCK_A.get())) {
-                                    ExpHud.incrementPts(-.05);
+                                    ExpHud.incrementPts(0);
                                 }
                             }
                         }
