@@ -101,6 +101,18 @@ public class Timer {
         data.put("old_phase", oldPhase);
         data.put("new_phase", phase);
         Data.addEvent(evt_type, Timer.timeElapsed(), data);
+
+        // Log distance traveled in previous phase
+        if (oldPhase != 1) {
+            double distance = Data.phaseDistanceMap.getOrDefault(oldPhase, 0.0);
+            Map<String, Object> distanceData = new HashMap<>();
+            distanceData.put("distance_traveled", distance);
+            long time = Timer.timeElapsed();
+            Data.addEvent("phase_" + oldPhase + "_end", time, distanceData);
+        }
+
+        // Optional: Reset last position for cleaner phase transition
+        Data.lastRecordedPosition = null;
     }
 
     public static int currentPhase() {
