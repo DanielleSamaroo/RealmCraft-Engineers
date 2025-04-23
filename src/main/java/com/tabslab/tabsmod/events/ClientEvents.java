@@ -396,7 +396,6 @@ public class ClientEvents {
                             }
                         }
                     }
-
                 }
 
                 if (block.equals(BlockInit.BLOCK_A.get())) {
@@ -602,6 +601,15 @@ public class ClientEvents {
                 Data.addEvent("player_move", time, data);
                 lastPosition = currentPosition;
             }
+
+            if (Data.lastRecordedPosition != null && !currentPosition.equals(Data.lastRecordedPosition)) {
+                double distance = currentPosition.distanceTo(Data.lastRecordedPosition);
+                int currentPhase = Timer.currentPhase();
+                Data.phaseDistanceMap.put(currentPhase,
+                        Data.phaseDistanceMap.getOrDefault(currentPhase, 0.0) + distance);
+            }
+
+            Data.lastRecordedPosition = currentPosition;
         }
 
         @SubscribeEvent
