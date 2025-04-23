@@ -34,7 +34,7 @@ public class Data {
     private static int numberOfSteps = 10;
     private static double probability = .5;
     private static final Map<UUID, Vec3> playerOriginPositions = new HashMap<>();
-    //public static boolean allowPhaseTeleport = true; // false = disabled teleportation
+    public static boolean allowPhaseTeleport = true; // false = disabled teleportation
     public static Map<Integer, Double> phaseDistanceMap = new HashMap<>();
     public static Vec3 lastRecordedPosition = null;
 
@@ -116,10 +116,10 @@ public class Data {
         System.out.println(entity.chunkPosition());
     }
 
-//    public static void setAllowPhaseTeleport(boolean allow) {
-//        allowPhaseTeleport = allow;
-//        System.out.println("DEBUG: allowPhaseTeleport set to " + allow);
-//    }
+    public static void setAllowPhaseTeleport(boolean allow) {
+        allowPhaseTeleport = allow;
+        System.out.println("DEBUG: allowPhaseTeleport set to " + allow);
+    }
 
     public static void teleportPlayerToDimension(ServerPlayer player, ResourceKey<Level> destinationDimension, Vec3 targetPos) {
         MinecraftServer server = player.getServer();
