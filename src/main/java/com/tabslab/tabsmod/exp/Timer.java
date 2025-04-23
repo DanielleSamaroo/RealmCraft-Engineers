@@ -11,57 +11,51 @@ import java.util.Map;
 
 public class Timer {
     private static long startTime = 0;
-    private static long phaseLength = 300000; // Milliseconds
+    private static long phaseLength = 300000;
     private static int totalPhases = 3;
     private static boolean timerStarted = false;
     private static long[] intervals = new long[0];
-    private static int currentInterval = 0; // Track the current interval
-    private static long pauseTime = 0; // Track when the timer was paused
+    private static int currentInterval = 0;
+    private static long pauseTime = 0;
     private static boolean timerPaused = false;
     private static int lastPhase = -1;
-
-    // vi Timer
+    private static long viElapsedBeforePause = 0;
     private static List<Long> viIntervals;
-    private static int currentViIndex = -1;
+    public static int viIndex = -1;
     private static long viStartTime = 0;
     private static boolean viTimerRunning = false;
+    private static boolean viTimerPaused = false;
 
     public static void pauseTimer() {
         if (!timerPaused) {
             pauseTime = System.currentTimeMillis();
             timerPaused = true;
         }
+        if (viTimerRunning && !viTimerPaused) {
+            viElapsedBeforePause = System.currentTimeMillis() - viStartTime;
+            viTimerPaused = true;
+        }
     }
 
     public static void resumeTimer() {
         if (timerPaused) {
             long pausedDuration = System.currentTimeMillis() - pauseTime;
-            startTime += pausedDuration; // Adjust start time by the paused duration
+            startTime += pausedDuration;
             timerPaused = false;
+        }
+
+        if (viTimerPaused) {
+            long pausedDuration = System.currentTimeMillis() - pauseTime;
+            viStartTime = System.currentTimeMillis() - viElapsedBeforePause;
+            viTimerPaused = false;
         }
     }
 
     public static long timeElapsed() {
         if (!timerStarted || timerPaused) {
-            return pauseTime - startTime; // Return the time before pausing
+            return pauseTime - startTime;
         }
         return System.currentTimeMillis() - startTime;
-    }
-
-
-    // Check if the stimulus point for the current interval has been reached
-    public static boolean isStimulusReached() {
-        long elapsedTime = timeElapsed();
-
-        // If all intervals are completed, return false
-        if (currentInterval >= intervals.length) return false;
-
-        // Check if elapsed time has passed the stimulus point of the current interval
-        if (elapsedTime >= intervals[currentInterval]) {
-            currentInterval++; // Move to the next interval
-            return true;       // Stimulus point reached
-        }
-        return false;
     }
 
     public static int getTotalPhases() {
@@ -71,12 +65,12 @@ public class Timer {
     public static void startTimer() {
         if (!timerStarted) {
             startTime = System.currentTimeMillis();
-            timerStarted = true;  // Set this to true when the timer starts
+            timerStarted = true;
         }
-
     }
+
     public static boolean timerStarted() {
-        return timerStarted;  // Getter method to check if the timer has started
+        return timerStarted;
     }
 
     public static void scheduleDelayedTask(Runnable task, long delayMillis) {
@@ -107,11 +101,21 @@ public class Timer {
         data.put("old_phase", oldPhase);
         data.put("new_phase", phase);
         Data.addEvent(evt_type, Timer.timeElapsed(), data);
+
+        // Log distance traveled in previous phase
+        if (oldPhase != 1) {
+            double distance = Data.phaseDistanceMap.getOrDefault(oldPhase, 0.0);
+            Map<String, Object> distanceData = new HashMap<>();
+            distanceData.put("distance_traveled", distance);
+            long time = Timer.timeElapsed();
+            Data.addEvent("phase_" + oldPhase + "_end", time, distanceData);
+        }
+
+        // Optional: Reset last position for cleaner phase transition
+        Data.lastRecordedPosition = null;
     }
 
     public static int currentPhase() {
-        // This is where the package will determine what phase the experiment is in
-        // when called.
         long elapsed = timeElapsed();
         return (int) Math.floorDiv(elapsed, phaseLength) + 1;
     }
@@ -124,12 +128,11 @@ public class Timer {
         setPhase(totalPhases + 1);
     }
 
-
-    public static void startViTimer() {
+    public static void startViTimer(int index) {
         if (viIntervals == null || viIntervals.isEmpty()) {
-            viIntervals = Data.generateIntervals(); // Generate intervals from Data.java
+            viIntervals = Data.generateIntervals();
         }
-        currentViIndex = 0;
+        viIndex = index;
         viStartTime = System.currentTimeMillis();
         viTimerRunning = true;
     }
@@ -138,33 +141,35 @@ public class Timer {
         return viIntervals;
     }
 
-    public static void newIntervals() {
-        viIntervals = Data.generateIntervals();
-    }
-
     public static long viTimeRemaining() {
-        if (!viTimerRunning || currentViIndex < 0 || currentViIndex >= viIntervals.size()) {
+        if (!viTimerRunning || viIndex < 0 || viIndex >= viIntervals.size()) {
             return 0;
         }
 
-        long elapsed = System.currentTimeMillis() - viStartTime;
-        long remaining = viIntervals.get(currentViIndex) - elapsed;
-
-        if (remaining <= 0) {
-            return 0;
+        long elapsed;
+        if (viTimerPaused) {
+            elapsed = viElapsedBeforePause;
+        } else {
+            elapsed = System.currentTimeMillis() - viStartTime;
         }
 
-        return remaining;
+        long remaining = viIntervals.get(viIndex) - elapsed;
+        return Math.max(remaining, 0);
     }
 
     public static void nextViInterval() {
-        if (viIntervals == null || viIntervals.isEmpty() || currentViIndex >= viIntervals.size() - 1) {
+        if (viIntervals == null || viIntervals.isEmpty()) {
             viIntervals = Data.generateIntervals();
-            currentViIndex = 0;
+            viIndex = 0;
+        } else if (viIndex >= viIntervals.size() - 1) {
+            viIntervals = Data.generateIntervals();
+            viIndex = 0;
         } else {
-            currentViIndex++;
+            viIndex++;
         }
+
         viStartTime = System.currentTimeMillis();
+        viElapsedBeforePause = 0;
     }
 
     public static boolean isViRunning() {
@@ -174,9 +179,17 @@ public class Timer {
     public static boolean hasPhaseChanged() {
         int currentPhase = currentPhase();
         if (currentPhase != lastPhase) {
-            lastPhase = currentPhase; // update last phase
-            return true; // phase has changed
+            lastPhase = currentPhase;
+            return true;
         }
-        return false; // no phase change
+        return false;
+    }
+    public static void resetViState() {
+        viIntervals = Data.generateIntervals();
+        viIndex = -1;
+        viStartTime = 0;
+        viElapsedBeforePause = 0;
+        viTimerRunning = false;
+        viTimerPaused = false;
     }
 }
